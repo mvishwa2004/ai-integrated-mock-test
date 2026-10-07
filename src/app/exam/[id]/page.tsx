@@ -9,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Loader2, Timer, ChevronRight, ChevronLeft, Send, Sparkles } from "lucide-react"
+import { parseApiResponse } from "@/lib/api-response"
+import type { EvaluateAnswersAndProvideFeedbackOutput } from "@/ai/flows/evaluate-answers-and-provide-feedback-flow"
 
 function stripOptionPrefix(option: string) {
   return option.replace(/^[A-D][).:\s-]+/i, "").trim()
@@ -91,10 +93,11 @@ export default function ExamSessionPage() {
       body: JSON.stringify(body),
     })
 
-    const payload = await response.json()
-    if (!response.ok || !payload?.success) {
-      throw new Error(payload?.error || 'Evaluation request failed')
-    }
+    const payload = await parseApiResponse<{ success: boolean; data: EvaluateAnswersAndProvideFeedbackOutput }>(
+      response,
+      "Evaluation request failed"
+    )
+    if (!payload.success) throw new Error("Evaluation request failed.")
     return payload.data
   }
 
@@ -112,20 +115,45 @@ export default function ExamSessionPage() {
         marks: (q as any).marks ?? 1
       }))
 
-      const result = await postEvaluation({ examAttempt: evaluationInput })
+      const evaluation = await postEvaluation({ examAttempt: evaluationInput })
+      const totalQuestions = exam.questions.length
+      const correctAnswers = exam.questions.filter((question) => {
+        const answer = answers[question.questionId]
+        return typeof answer === "string" &&
+          answer.trim().toUpperCase().replace(/^OPTION\s+/, "").charAt(0) ===
+          question.correctAnswer.trim().toUpperCase().replace(/^OPTION\s+/, "").charAt(0)
+      }).length
+      const attemptedQuestions = exam.questions.filter((question) => Boolean(answers[question.questionId])).length
+      const result: EvaluateAnswersAndProvideFeedbackOutput = {
+        ...evaluation,
+        totalQuestions,
+        correctAnswers,
+        incorrectAnswers: totalQuestions - correctAnswers,
+        attemptedQuestions,
+        accuracy: totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0,
+      }
 
       const updatedExam = {
         ...exam,
         answers,
-        result
+        result,
+        duration: Math.max(0, Math.floor((60 * 60 - timeLeft) / 60)),
       }
+
+      const response = await fetch("/api/exams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exam: updatedExam }),
+      })
+      await parseApiResponse<{ success: true }>(response, "Failed to save exam results.")
 
       saveExam(updatedExam)
       router.push(`/exam/${exam.id}/results`)
     } catch (error) {
       console.error(error)
-      alert("Evaluation timed out. Don't worry, your progress is saved. Check your dashboard in a moment.")
-      router.push("/dashboard")
+      alert(error instanceof Error
+        ? `Your exam could not be saved: ${error.message}`
+        : "Your exam could not be saved. Please try again.")
     } finally {
       setSubmitting(false)
     }

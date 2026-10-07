@@ -9,9 +9,18 @@ using Genkit and Google's Gemini models.
 
    ```
    GOOGLE_API_KEY=your_google_genai_api_key_here
+   MYSQL_HOST=localhost
+   MYSQL_PORT=3306
+   MYSQL_DATABASE=mocktest
+   MYSQL_USER=your_mysql_username
+   MYSQL_PASSWORD=your_mysql_password
    ```
 
-   The application will throw an error on startup if this variable is missing.
+   `MYSQL_*` settings are required for MySQL-backed signup, login, exam history,
+   and topic analytics. Keep them server-only; do not prefix them with
+   `NEXT_PUBLIC_` or commit real credentials.
+
+   The application will throw an error on startup if the Google API key is missing.
 
    Additionally, the server must be able to reach Google's GenAI endpoint:
    `https://generativelanguage.googleapis.com`. If you are behind a

@@ -9,26 +9,35 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { BrainCircuit, Loader2 } from "lucide-react"
+import { parseApiResponse } from "@/lib/api-response"
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const { saveAuthenticatedUser, registerUser } = useAppStore()
+  const { saveAuthenticatedUser } = useAppStore()
 
-  const handleSignup = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
     const formData = new FormData(e.currentTarget)
     const name = String(formData.get("name") || "").trim()
-    const email = String(formData.get("email") || "").trim()
+    const email = String(formData.get("email") || "").trim().toLowerCase()
     const password = String(formData.get("password") || "")
 
     try {
-      const user = registerUser(name, email, password)
-      saveAuthenticatedUser(user)
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      })
+      const payload = await parseApiResponse<{ user: { id: string; name: string; email: string } }>(
+        response,
+        "Signup failed. Please try again."
+      )
+      saveAuthenticatedUser(payload.user)
       router.push("/dashboard")
     } catch (err) {
       setError(
@@ -63,7 +72,7 @@ export default function SignupPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" required className="bg-background/50 border-white/10" />
+                <Input id="password" name="password" type="password" minLength={8} required className="bg-background/50 border-white/10" />
               </div>
               {error ? <p className="text-sm text-destructive">{error}</p> : null}
             </CardContent>

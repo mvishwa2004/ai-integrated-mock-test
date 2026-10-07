@@ -76,7 +76,11 @@ export function DashboardNav() {
       <div className="mt-auto">
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
+            const response = await fetch("/api/auth/logout", { method: "POST" })
+            if (!response.ok) {
+              throw new Error("Unable to log out. Please try again.")
+            }
             logout()
             router.push("/auth/login")
           }}

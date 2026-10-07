@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { BrainCircuit, Loader2 } from "lucide-react"
+import { parseApiResponse } from "@/lib/api-response"
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +17,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const { saveAuthenticatedUser, authenticateUser } = useAppStore()
+  const { saveAuthenticatedUser } = useAppStore()
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError("")
@@ -28,12 +29,16 @@ export default function LoginPage() {
     const password = String(formData.get("password") || "")
 
     try {
-      const user = authenticateUser(email, password)
-      if (!user) {
-        throw new Error("Invalid email or password")
-      }
-
-      saveAuthenticatedUser(user)
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      const payload = await parseApiResponse<{ user: { id: string; name: string; email: string } }>(
+        response,
+        "Login failed. Please try again."
+      )
+      saveAuthenticatedUser(payload.user)
       router.push("/dashboard")
     } catch (err) {
       setError(

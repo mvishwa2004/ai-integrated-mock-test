@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAppStore, ExamRecord } from "@/lib/store"
+import { ExamRecord } from "@/lib/store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,14 +15,37 @@ import {
 } from "@/components/ui/table"
 import { format } from "date-fns"
 import Link from "next/link"
-import { Eye, Download, Trash2 } from "lucide-react"
+import { Eye, Download } from "lucide-react"
+import { parseApiResponse } from "@/lib/api-response"
 
 export default function HistoryPage() {
-  const { getExams } = useAppStore()
   const [exams, setExams] = useState<ExamRecord[]>([])
+  const [weakestTopics, setWeakestTopics] = useState<Array<{ topic: string; accuracyPercent: number }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    setExams(getExams().sort((a, b) => b.timestamp - a.timestamp))
+    let cancelled = false
+    fetch("/api/exams")
+      .then(async (response) => {
+        const payload = await parseApiResponse<{
+          exams: ExamRecord[]
+          weakestTopics: Array<{ topic: string; accuracyPercent: number }>
+        }>(response, "Unable to load exam history.")
+        if (!cancelled) {
+          setExams(payload.exams)
+          setWeakestTopics(payload.weakestTopics)
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Unable to load exam history.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const getScoreBadge = (score: number) => {
@@ -67,13 +90,33 @@ Weakest Areas: ${weakestTopics}
         <p className="text-muted-foreground">Review all your past mock exam attempts</p>
       </div>
 
+      {weakestTopics.length > 0 && (
+        <Card className="glass-morphism border-white/5">
+          <CardHeader>
+            <CardTitle>Topics to Improve</CardTitle>
+            <CardDescription>Your lowest accuracy across completed exams</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {weakestTopics.map(({ topic, accuracyPercent }) => (
+              <Badge key={topic} variant="outline">
+                {topic}: {accuracyPercent}%
+              </Badge>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="glass-morphism border-white/5">
         <CardHeader>
           <CardTitle>Recent Exams</CardTitle>
           <CardDescription>Details of all your mock exam attempts</CardDescription>
         </CardHeader>
         <CardContent>
-          {exams.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-8 text-muted-foreground">Loading exam history...</p>
+          ) : error ? (
+            <p role="alert" className="text-center py-8 text-destructive">{error}</p>
+          ) : exams.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">No exams attempted yet</p>
               <Button asChild>

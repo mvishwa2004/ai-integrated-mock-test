@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Loader2, Zap, BrainCircuit, Target } from "lucide-react"
+import { parseApiResponse } from "@/lib/api-response"
 
 type TopicAnalysisEntry = {
   topic: string
@@ -193,10 +194,11 @@ function NewExamForm() {
       },
       body: JSON.stringify(body),
     })
-    const payload = await response.json()
-    if (!response.ok || !payload?.success) {
-      throw new Error(payload?.error || 'Failed to generate exam questions')
-    }
+    const payload = await parseApiResponse<{ success: boolean; data: any }>(
+      response,
+      "Failed to generate exam questions"
+    )
+    if (!payload.success) throw new Error("Failed to generate exam questions.")
     return payload.data
   }
 

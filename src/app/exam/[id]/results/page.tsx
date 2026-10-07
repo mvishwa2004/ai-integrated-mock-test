@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { useAppStore, ExamRecord } from "@/lib/store"
+import { ExamRecord } from "@/lib/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ import {
   Loader2
 } from "lucide-react"
 import Link from "next/link"
+import { parseApiResponse } from "@/lib/api-response"
 
 function normalizeSectionName(topic: string) {
   const normalized = topic.trim().toLowerCase();
@@ -47,25 +48,29 @@ function buildSectionSummary(topicAnalysis: Array<{ topic: string; performancePe
 export default function ResultPage() {
   const params = useParams()
   const router = useRouter()
-  const { getExams } = useAppStore()
   const [exam, setExam] = useState<ExamRecord | null>(null)
 
   const examId = Array.isArray(params.id) ? params.id[0] : params.id
 
   useEffect(() => {
-    const allExams = getExams()
-    const currentExam = examId ? allExams.find((e) => e.id === examId) : undefined
-    if (!currentExam || !currentExam.result) {
-      router.push("/dashboard")
-      return
+    let cancelled = false
+    fetch("/api/exams")
+      .then(async (response) => {
+        const payload = await parseApiResponse<{ exams: ExamRecord[] }>(
+          response,
+          "Unable to load exam result."
+        )
+        const currentExam = payload.exams.find((item: ExamRecord) => item.id === examId)
+        if (!currentExam?.result) throw new Error("Exam result was not found.")
+        if (!cancelled) setExam(currentExam)
+      })
+      .catch((error: unknown) => {
+        console.error("Unable to load saved exam result:", error)
+        if (!cancelled) router.push("/dashboard/history")
+      })
+    return () => {
+      cancelled = true
     }
-
-    setExam((prevExam) => {
-      if (prevExam?.id === currentExam.id && prevExam.result === currentExam.result) {
-        return prevExam
-      }
-      return currentExam
-    })
   }, [examId, router])
 
   if (!exam) {
