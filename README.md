@@ -20,6 +20,9 @@ using Genkit and Google's Gemini models.
    and topic analytics. Keep them server-only; do not prefix them with
    `NEXT_PUBLIC_` or commit real credentials.
 
+   Create the MySQL tables by running [`mysql_schema.sql`](./mysql_schema.sql).
+   See [`MYSQL_SETUP.md`](./MYSQL_SETUP.md) for setup and verification queries.
+
    The application will throw an error on startup if the Google API key is missing.
 
    Additionally, the server must be able to reach Google's GenAI endpoint:
